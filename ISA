@@ -1,0 +1,34 @@
+leek16 ISA Specification
+========================
+
+1. Overview
+
+Word size:       16 bits
+Registers:       8 x 16 bit general purpose
+Address Width:   16 bits
+Memory:          64 KiB (2^16)
+Reset PC:        0x0000
+
+2. Registers
+
+R0-7:      16 bit general purpose
+PC:        16 bit program counter
+SP:        16 bit stack pointer
+CND:       1 bit condition flag
+
+3. Memory Layout
+
+Memory spans the full 16 bit address space.
+
+	0x0000 - 0xFFFF
+
+Memory is byte addressable and 16 bit values are stored big-endian.
+
+Example:
+
+	16 bit instruction layout
+	instruction = 0x1234
+	address @ 0x1000 = 0x12
+	address @ 0x1001 = 0x34
+
+4. 
