@@ -1,0 +1,196 @@
+leek16 ISA Specification
+========================
+
+1. Overview
+
+Word size:       16 bits
+Registers:       8 x 16 bit general purpose
+Address Width:   16 bits
+Memory:          64 KiB (2^16)
+Reset PC:        0x0000
+
+2. Registers
+
+R0-7:      16 bit general purpose
+PC:        16 bit program counter
+SP:        16 bit stack pointer
+CND:       1 bit condition flag
+
+3. Memory Layout
+
+Memory spans the full 16 bit address space.
+
+	0x0000 - 0xFFFF
+
+Memory is byte addressable and 16 bit values are stored big-endian.
+
+Example:
+
+	16 bit instruction layout
+	instruction = 0x1234
+	address @ 0x1000 = 0x12
+	address @ 0x1001 = 0x34
+
+4.  Standard Instruction Format
+
+A standard 16-bit (word) instruction:
+
+15               8        5        2        0
++----------------+--------+--------+--------+
+|     OPCODE     |   RD   |   RS1  |  RS2   |
++----------------+--------+--------+--------+
+      7 bits          3        3        3
+
+
+5.  Immediate Instruction Format
+
+An immediate instruction occupies 32-bits, or two words.
+
+First word:
+
+15               8        5        2        0
++----------------+--------+--------+--------+
+|     OPCODE     |   RD   |   RS   |  RESV  |
++----------------+--------+--------+--------+
+      7 bits          3        3        3
+
+RESV is a *reserved* field and MUST be set to 0.
+
+Second word
+
+15                                          0
++-------------------------------------------+
+|                 Immediate                 |
++-------------------------------------------+
+                 16 bits
+
+
+After a standard instruction:
+PC += 2 (for 2 bytes, 16 bits)
+
+After an immediate instruction:
+PC += 4 (for 4 bytes, 32 bits)
+
+6. Instructions
+
+ADD
+	Syntax:
+		R1 := R2 + R3
+
+	Operation:
+		R1 = R2 + R3
+
+	Length:
+		16 bits
+
+ADDI
+	Syntax:
+		R1 := R2 + 5 (constant)
+		R1 := 5 + R2
+
+	Operation:
+		R1 = R2 + IMM16
+
+	Length:
+		32 bits
+
+LOADI
+	Syntax:
+		R1 := 0x1234 (constant)
+
+	Operation:
+		R1 = IMM16
+
+	Length:
+		32 bits
+
+LOADR
+	Syntax:
+		R1 <- [R2]
+		[R2] -> R1
+
+	Operation:
+		R1 = MEMORY[R2]
+
+	Length:
+		16 bits
+
+STORER
+	Syntax:
+		R1 -> [R2]
+		[R2] <- R1
+
+	Operation:
+		MEMORY[R2] = R1
+
+	Length:
+		16 bits
+
+
+7. Comparisons/Conditionals
+
+Comparisons set the CND register to either 1 or 0, true or false respectively. They interpret operands as unsigned 16-bit integers.
+
+	R1 == R2
+	R1 != R2
+	R1 > R2
+	R1 < R2
+	R1 >= R2
+	R1 <= R2
+
+For example:
+
+	R1 > R2
+
+is equivalent to:
+
+	CND = (R1 > R2)
+
+8. Bit shifting
+
+You can bit shift using the classic << and >>.
+
+For example:
+
+	R1 := R2 >> 4
+
+This shifts the value in R2 to the right by 4 bits and then stores the result in R1.
+
+A bit shift using two registers is a 16 bit instruction. A bit shift using a constant is a 32 bit instruction where the second word is the constant.
+
+A quick note:
+
+	R1 := 5 << R2
+
+will be compiled into machine instruction as:
+
+	R1 := 5 (LOADI) (32 bits)
+	R1 := R1 << R2 (SHLR) (16 bits)
+
+9. Control Flow
+
+JMP LABEL
+
+	PC = address(LABEL)
+
+BRT LABEL
+
+	if CND == 1:
+		JMP LABEL
+
+BRF LABEL
+
+	if CND == 0:
+		JMP LABEL
+
+All control flow operations are 32 bit instructions. The second word is the 16 bit address to jump to.
+
+10. Reset/Boot
+
+On reset:
+
+	PC = 0x0000
+	SP = 0xFFFE
+	CND = 0
+
+We being execution at address 0x0000.
