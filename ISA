@@ -50,9 +50,11 @@ First word:
 
 15               8        5        2        0
 +----------------+--------+--------+--------+
-|     OPCODE     |   RD   |   RS   |  N/A   |
+|     OPCODE     |   RD   |   RS   |  RESV  |
 +----------------+--------+--------+--------+
       7 bits          3        3        3
+
+RESV is a *reserved* field and MUST be set to 0.
 
 Second word
 
@@ -127,7 +129,7 @@ STORER
 
 7. Comparisons/Conditionals
 
-Comparisons set the CND register to either 1 or 0, true or false respectively.
+Comparisons set the CND register to either 1 or 0, true or false respectively. They interpret operands as unsigned 16-bit integers.
 
 	R1 == R2
 	R1 != R2
@@ -154,6 +156,17 @@ For example:
 
 This shifts the value in R2 to the right by 4 bits and then stores the result in R1.
 
+A bit shift using two registers is a 16 bit instruction. A bit shift using a constant is a 32 bit instruction where the second word is the constant.
+
+A quick note:
+
+	R1 := 5 << R2
+
+will be compiled into machine instruction as:
+
+	R1 := 5 (LOADI) (32 bits)
+	R1 := R1 << R2 (SHLR) (16 bits)
+
 9. Control Flow
 
 JMP LABEL
@@ -169,6 +182,8 @@ BRF LABEL
 
 	if CND == 0:
 		JMP LABEL
+
+All control flow operations are 32 bit instructions. The second word is the 16 bit address to jump to.
 
 10. Reset/Boot
 
