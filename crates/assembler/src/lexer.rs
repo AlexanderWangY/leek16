@@ -40,28 +40,32 @@ impl<'a> Lexer<'a> {
             None => return Ok(None),
         };
 
-        match c {
-            b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.lex_word().map(Some),
-            b'0'..=b'9' => self.lex_number().map(Some),
-            b'>' => self.lex_greater().map(Some),
+        let result = match c {
+            b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.lex_word(),
+            b'0'..=b'9' => self.lex_number(),
+            b'>' => self.lex_greater(),
 
             // This can also be the start of an arrow btw
-            b'<' => self.lex_less().map(Some),
-            b'=' => self.lex_equal().map(Some),
-            b':' => self.lex_colon().map(Some),
-            b'[' => self.lex_lbracket().map(Some),
-            b']' => self.lex_rbracket().map(Some),
-            b'-' => self.lex_hyphen().map(Some),
-            b'+' => self.lex_plus().map(Some),
-            b'!' => self.lex_bang().map(Some),
-            b'&' => self.lex_ampersand().map(Some),
-            b'|' => self.lex_pipe().map(Some),
-            _ => Err(LexError::UnexpectedCharacter {
-                ch: c,
-                line: self.line,
-                column: self.column,
-            }),
-        }
+            b'<' => self.lex_less(),
+            b'=' => self.lex_equal(),
+            b':' => self.lex_colon(),
+            b'[' => self.lex_lbracket(),
+            b']' => self.lex_rbracket(),
+            b'-' => self.lex_hyphen(),
+            b'+' => self.lex_plus(),
+            b'!' => self.lex_bang(),
+            b'&' => self.lex_ampersand(),
+            b'|' => self.lex_pipe(),
+            _ => {
+                return Err(LexError::UnexpectedCharacter {
+                    ch: c,
+                    line: self.line,
+                    column: self.column,
+                });
+            }
+        };
+
+        result.map(Some)
     }
 
     fn lex_word(&mut self) -> Result<Token, LexError> {
