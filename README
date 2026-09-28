@@ -1,6 +1,6 @@
 leek16 is a 16-bit ISA. In this repository you will find
 
-- leek16-stage: a simple leek16 emulator
-- leek16-orch: a leek16 ISA compiler
+- Leek Emulator: a leek16 emulator
+- Leek Assembler: a Leek lang compiler.
 
 You can find the ISA specification in /specs
