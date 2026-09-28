@@ -144,7 +144,17 @@ is equivalent to:
 
 	CND = (R1 > R2)
 
-8. Control Flow
+8. Bit shifting
+
+You can bit shift using the classic << and >>.
+
+For example:
+
+	R1 := R2 >> 4
+
+This shifts the value in R2 to the right by 4 bits and then stores the result in R1.
+
+9. Control Flow
 
 JMP LABEL
 
@@ -160,7 +170,7 @@ BRF LABEL
 	if CND == 0:
 		JMP LABEL
 
-9. Reset/Boot
+10. Reset/Boot
 
 On reset:
 
