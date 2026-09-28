@@ -3,4 +3,4 @@ leek16 is a 16-bit ISA. In this repository you will find
 - Leek Emulator: a leek16 emulator
 - Leek Assembler: a Leek lang compiler.
 
-You can find the ISA specification in /specs
+You can find the ISA specification in the ISA file.
