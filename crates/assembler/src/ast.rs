@@ -1,17 +1,21 @@
 use crate::token::RegisterKind;
 
+#[derive(Debug, Clone)]
 pub struct Label(pub String);
 
+#[derive(Debug, Clone)]
 pub enum Address {
     Register(RegisterKind), // [R1]
     Immediate(u16),         // [0x1000]
 }
 
+#[derive(Debug, Clone)]
 pub enum Operand {
     Register(RegisterKind),
     Immediate(u16),
 }
 
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -21,10 +25,12 @@ pub enum BinaryOp {
     ShiftR,
 }
 
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Not,
 }
 
+#[derive(Debug, Clone)]
 pub enum CompareOp {
     Greater,
     Less,
@@ -34,11 +40,13 @@ pub enum CompareOp {
     NotEqual,
 }
 
+#[derive(Debug, Clone)]
 pub struct Function {
     pub label: Label,
     pub instructions: Vec<Instruction>,
 }
 
+#[derive(Debug, Clone)]
 pub enum Instruction {
     Move {
         dst: RegisterKind,
@@ -55,6 +63,7 @@ pub enum Instruction {
     Unary {
         dst: RegisterKind,
         op: UnaryOp,
+        src: RegisterKind,
     },
 
     Load {
@@ -86,11 +95,13 @@ pub enum Instruction {
     },
 }
 
+#[derive(Debug, Clone)]
 pub enum Item {
     Function(Function),
     Instruction(Instruction),
 }
 
+#[derive(Debug, Clone)]
 pub struct Ast {
     pub items: Vec<Item>,
 }

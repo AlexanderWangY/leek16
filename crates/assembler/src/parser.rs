@@ -1,5 +1,7 @@
 use crate::{
-    ast::{Ast, BinaryOp, Function, Instruction, Item, Label, Operand},
+    ast::{
+        Address, Ast, BinaryOp, CompareOp, Function, Instruction, Item, Label, Operand, UnaryOp,
+    },
     error::ParseError,
     token::{RegisterKind, Token, TokenKind},
 };
@@ -14,19 +16,21 @@ impl<'a> Parser<'a> {
         Self { pos: 0, tokens }
     }
 
-    pub fn parse(&self) -> Result<Ast, ParseError> {
+    pub fn parse(&mut self) -> Result<Ast, ParseError> {
         let mut ast = Ast::new();
 
         while !self.is_eof() {
-            let token = self.current().ok_or_else(|| ParseError::MissingToken)?;
+            let token = self.current().ok_or(ParseError::MissingToken)?;
 
             let item = match token.kind {
                 TokenKind::Func => Item::Function(self.parse_function()?),
                 _ => Item::Instruction(self.parse_instruction()?),
             };
+
+            ast.items.push(item);
         }
 
-        Ok(Ast {})
+        Ok(ast)
     }
 
     fn parse_function(&mut self) -> Result<Function, ParseError> {
@@ -61,7 +65,9 @@ impl<'a> Parser<'a> {
     fn parse_instruction(&mut self) -> Result<Instruction, ParseError> {
         if let Some(token) = self.current() {
             match &token.kind {
-                TokenKind::Register(_) => return self.parse_register_instruction(),
+                TokenKind::Register(_) | TokenKind::Number(_) => {
+                    return self.parse_operand_instruction();
+                }
                 TokenKind::LBracket => return self.parse_memory_transfer(),
                 TokenKind::Jmp | TokenKind::Brt | TokenKind::Brf => return self.parse_branch(),
                 _ => return Err(ParseError::UnexpectedToken),
@@ -71,21 +77,145 @@ impl<'a> Parser<'a> {
         Err(ParseError::MissingToken)
     }
 
-    fn parse_register_instruction(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_operand_instruction(&mut self) -> Result<Instruction, ParseError> {
         // If next is := , that is assignment, if it is >, <, >=, <= or == or !=, it is binary op
         let token = self.peek(1).ok_or(ParseError::MissingToken)?;
 
         match &token.kind {
-            TokenKind::Assign => {}
-            TokenKind::Less => {}
+            TokenKind::Assign => self.parse_assign(),
+            TokenKind::Less
+            | TokenKind::LessEq
+            | TokenKind::Greater
+            | TokenKind::GreaterEq
+            | TokenKind::Equal
+            | TokenKind::NotEqual => self.parse_compare(),
+            TokenKind::ArrowLeft | TokenKind::ArrowRight => self.parse_memory_transfer(),
+            _ => Err(ParseError::UnexpectedToken),
         }
     }
-    fn parse_memory_transfer(&mut self) -> Result<Instruction, ParseError> {}
-    fn parse_branch(&mut self) -> Result<Instruction, ParseError> {}
+    fn parse_memory_transfer(&mut self) -> Result<Instruction, ParseError> {
+        // If first is a register, then this is either R1 -> [R0] or R1 <- [R0]
+        // If first is a [, then this is either [R0] -> R1 or [R0] <- R1
+
+        let token = self.current().ok_or(ParseError::MissingToken)?;
+
+        match token.kind {
+            TokenKind::LBracket => {
+                let addr = self.parse_address()?;
+                let arrow = self.current().ok_or(ParseError::MissingToken)?.kind.clone();
+                self.advance();
+
+                let reg = self.expect_register()?;
+                self.advance();
+
+                match arrow {
+                    TokenKind::ArrowRight => Ok(Instruction::Load { dst: reg, addr }),
+                    TokenKind::ArrowLeft => Ok(Instruction::Store {
+                        addr,
+                        src: Operand::Register(reg),
+                    }),
+                    _ => Err(ParseError::UnexpectedToken),
+                }
+            }
+            TokenKind::Register(_) => {
+                let reg = self.expect_register()?;
+                self.advance();
+
+                let arrow = self.current().ok_or(ParseError::MissingToken)?.kind.clone();
+                self.advance();
+
+                let addr = self.parse_address()?;
+
+                match arrow {
+                    TokenKind::ArrowRight => Ok(Instruction::Store {
+                        addr,
+                        src: Operand::Register(reg),
+                    }),
+                    TokenKind::ArrowLeft => Ok(Instruction::Load { dst: reg, addr }),
+                    _ => Err(ParseError::UnexpectedToken),
+                }
+            }
+            TokenKind::Number(_) => todo!(),
+            _ => Err(ParseError::UnexpectedToken),
+        }
+    }
+
+    fn parse_address(&mut self) -> Result<Address, ParseError> {
+        self.expect(TokenKind::LBracket)?;
+        self.advance();
+        let addr = match self
+            .current()
+            .ok_or(ParseError::UnexpectedToken)?
+            .kind
+            .clone()
+        {
+            TokenKind::Register(reg) => Address::Register(reg),
+            TokenKind::Number(num) => Address::Immediate(num),
+            _ => return Err(ParseError::UnexpectedToken),
+        };
+        self.advance();
+        self.expect(TokenKind::RBracket)?;
+        self.advance();
+        Ok(addr)
+    }
+
+    fn parse_branch(&mut self) -> Result<Instruction, ParseError> {
+        let kind = self.current().ok_or(ParseError::MissingToken)?.kind.clone();
+
+        self.advance();
+
+        let label = self.expect_identifier()?;
+        self.advance();
+
+        match kind {
+            TokenKind::Jmp => Ok(Instruction::Jump {
+                target: Label(label),
+            }),
+            TokenKind::Brt => Ok(Instruction::BranchTrue {
+                target: Label(label),
+            }),
+            TokenKind::Brf => Ok(Instruction::BranchFalse {
+                target: Label(label),
+            }),
+            _ => Err(ParseError::UnexpectedToken),
+        }
+    }
+
+    fn parse_compare(&mut self) -> Result<Instruction, ParseError> {
+        let lhs = match self.current().ok_or(ParseError::MissingToken)?.kind.clone() {
+            TokenKind::Register(reg) => Operand::Register(reg),
+            TokenKind::Number(num) => Operand::Immediate(num),
+            _ => return Err(ParseError::UnexpectedToken),
+        };
+        self.advance();
+
+        let op = match self.current().ok_or(ParseError::MissingToken)?.kind {
+            TokenKind::Greater => CompareOp::Greater,
+            TokenKind::GreaterEq => CompareOp::GreaterEq,
+            TokenKind::Less => CompareOp::Less,
+            TokenKind::LessEq => CompareOp::LessEq,
+            TokenKind::Equal => CompareOp::Equal,
+            TokenKind::NotEqual => CompareOp::NotEqual,
+            _ => return Err(ParseError::UnexpectedToken),
+        };
+        self.advance();
+
+        let rhs = match self.current().ok_or(ParseError::MissingToken)?.kind.clone() {
+            TokenKind::Register(reg) => Operand::Register(reg),
+            TokenKind::Number(num) => Operand::Immediate(num),
+            _ => return Err(ParseError::UnexpectedToken),
+        };
+        self.advance();
+
+        if matches!(lhs, Operand::Immediate(_)) && matches!(rhs, Operand::Immediate(_)) {
+            return Err(ParseError::UnexpectedToken);
+        }
+
+        Ok(Instruction::Compare { op, lhs, rhs })
+    }
 
     fn parse_assign(&mut self) -> Result<Instruction, ParseError> {
         // So basically at this point its R1 := xxxxx
-
         let op = self.peek(3).and_then(|token| match &token.kind {
             TokenKind::Plus => Some(BinaryOp::Add),
             TokenKind::Minus => Some(BinaryOp::Sub),
@@ -98,7 +228,24 @@ impl<'a> Parser<'a> {
 
         let dest_reg = self.expect_register()?;
         self.advance(); // Skip R0
-        self.advance(); // Skip := 
+        self.expect(TokenKind::Assign)?;
+        self.advance(); // Skip :=
+
+        // Check for unary !
+        if matches!(
+            &self.current().ok_or(ParseError::MissingToken)?.kind,
+            TokenKind::Not
+        ) {
+            self.advance();
+            let src = self.expect_register()?;
+            self.advance();
+
+            return Ok(Instruction::Unary {
+                dst: dest_reg,
+                op: UnaryOp::Not,
+                src,
+            });
+        }
 
         if let Some(op) = op {
             // This means there was a valid operation after
@@ -120,12 +267,12 @@ impl<'a> Parser<'a> {
             };
             self.advance();
 
-            return Ok(Instruction::Binary {
+            Ok(Instruction::Binary {
                 dst: dest_reg,
                 op,
                 lhs,
                 rhs,
-            });
+            })
         } else {
             let slot0 = self.current().ok_or(ParseError::MissingToken)?;
             let lhs = match &slot0.kind {
@@ -135,10 +282,10 @@ impl<'a> Parser<'a> {
             };
             self.advance();
 
-            return Ok(Instruction::Move {
+            Ok(Instruction::Move {
                 dst: dest_reg,
                 src: lhs,
-            });
+            })
         }
     }
 
@@ -146,18 +293,18 @@ impl<'a> Parser<'a> {
         let token = self.tokens.get(self.pos).ok_or(ParseError::MissingToken)?;
 
         match &token.kind {
-            TokenKind::Identifier(label) => return Ok(label.clone()),
-            _ => return Err(ParseError::UnexpectedToken),
-        };
+            TokenKind::Identifier(label) => Ok(label.clone()),
+            _ => Err(ParseError::UnexpectedToken),
+        }
     }
 
     fn expect_register(&self) -> Result<RegisterKind, ParseError> {
         let token = self.tokens.get(self.pos).ok_or(ParseError::MissingToken)?;
 
         match &token.kind {
-            TokenKind::Register(kind) => return Ok(kind.clone()),
-            _ => return Err(ParseError::UnexpectedToken),
-        };
+            TokenKind::Register(kind) => Ok(kind.clone()),
+            _ => Err(ParseError::UnexpectedToken),
+        }
     }
 
     fn expect(&self, kind: TokenKind) -> Result<&'a Token, ParseError> {
