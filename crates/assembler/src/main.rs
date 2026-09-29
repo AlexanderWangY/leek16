@@ -3,8 +3,10 @@ use std::{env, fs, io::Error};
 use crate::error::LexError;
 use crate::lexer::Lexer;
 
+mod ast;
 mod error;
 mod lexer;
+mod parser;
 mod token;
 
 fn main() -> Result<(), Error> {

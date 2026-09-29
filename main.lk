@@ -46,14 +46,11 @@ BRT greater_path
 BRF lesser_path
 JMP done
 
-greater_path:
 R6 := R6 + 1
 JMP done
 
-lesser_path:
 R6 := R6 - R1
 
-done:
 R7 := R6
 
 END
