@@ -1,5 +1,3 @@
-use std::io::Error;
-
 use crate::{
     error::LexError,
     token::{RegisterKind, Token, TokenKind},
@@ -350,10 +348,6 @@ impl<'a> Lexer<'a> {
         self.source.get(self.pos).copied()
     }
 
-    fn peek(&self, offset: usize) -> Option<u8> {
-        self.source.get(self.pos + offset).copied()
-    }
-
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.current() {
             match c {
@@ -375,12 +369,6 @@ impl<'a> Lexer<'a> {
             } else {
                 self.column += 1;
             }
-        }
-    }
-
-    pub fn print_source(&self) {
-        for byte in self.source.iter() {
-            print!("{}", *byte as char);
         }
     }
 }

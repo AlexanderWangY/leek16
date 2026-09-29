@@ -11,3 +11,10 @@ pub enum LexError {
         column: usize,
     },
 }
+
+#[derive(Debug)]
+pub enum ParseError {
+    MissingToken,
+    MissingFunctionEnd,
+    UnexpectedToken,
+}
