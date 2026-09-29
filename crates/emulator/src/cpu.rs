@@ -1,19 +1,29 @@
-use crate::ram::Ram;
+#[derive(Default)]
+pub struct GeneralRegisters {
+    pub r0: u16,
+    pub r1: u16,
+    pub r2: u16,
+    pub r3: u16,
+    pub r4: u16,
+    pub r5: u16,
+    pub r6: u16,
+    pub r7: u16,
+}
 
 pub struct Cpu {
-    registers: [u16; 8],
-    pc: u16,
-    ic: u16,
-    ram: Ram,
+    pub reg: GeneralRegisters,
+    pub pc: u16,
+    pub sp: u16,
+    pub cnd: bool,
 }
 
 impl Cpu {
     pub fn new() -> Self {
         Cpu {
-            registers: [0; 8],
-            pc: 0,
-            ic: 0,
-            ram: Ram::new(),
+            reg: GeneralRegisters::default(),
+            pc: 0, // 0x0000
+            sp: 0xFFFE,
+            cnd: false,
         }
     }
 }
