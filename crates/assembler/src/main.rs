@@ -3,11 +3,13 @@ use std::{env, fs, io::Error};
 use crate::error::{LexError, ParseError};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
+use crate::symbol::SymbolTable;
 
 mod ast;
 mod error;
 mod lexer;
 mod parser;
+mod symbol;
 mod token;
 
 fn main() -> Result<(), Error> {
@@ -158,6 +160,10 @@ fn main() -> Result<(), Error> {
     };
 
     println!("{:?}", ast);
+
+    let symbol_table = SymbolTable::build(&ast);
+
+    println!("{:?}", symbol_table);
 
     Ok(())
 }

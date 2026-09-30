@@ -1,6 +1,6 @@
 use crate::token::RegisterKind;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Label(pub String);
 
 #[derive(Debug, Clone)]
