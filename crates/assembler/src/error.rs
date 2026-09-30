@@ -59,3 +59,8 @@ pub enum ParseError {
         column: usize,
     },
 }
+
+#[derive(Debug)]
+pub enum SymbolError {
+    DuplicateFunction { label: String },
+}
