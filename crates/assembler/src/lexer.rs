@@ -200,7 +200,13 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 TokenKind::Equal
             }
-            _ => TokenKind::Greater,
+            _ => {
+                return Err(LexError::UnexpectedCharacter {
+                    ch: b'=',
+                    line: start_line,
+                    column: start_col,
+                });
+            }
         };
 
         Ok(Token {

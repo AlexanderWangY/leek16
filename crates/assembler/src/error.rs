@@ -1,3 +1,5 @@
+use crate::token::TokenKind;
+
 #[derive(Debug)]
 pub enum LexError {
     UnexpectedCharacter {
@@ -14,7 +16,46 @@ pub enum LexError {
 
 #[derive(Debug)]
 pub enum ParseError {
-    MissingToken,
-    MissingFunctionEnd,
-    UnexpectedToken,
+    MissingToken {
+        expected: &'static str,
+        line: usize,
+        column: usize,
+    },
+    MissingFunctionEnd {
+        name: String,
+        line: usize,
+        column: usize,
+    },
+    UnexpectedToken {
+        found: TokenKind,
+        expected: &'static str,
+        line: usize,
+        column: usize,
+    },
+    UnmatchedFunctionEnd {
+        line: usize,
+        column: usize,
+    },
+    NestedFunction {
+        outer: String,
+        line: usize,
+        column: usize,
+    },
+    ImmediateCompare {
+        lhs: u16,
+        rhs: u16,
+        line: usize,
+        column: usize,
+    },
+    LoadIntoImmediate {
+        value: u16,
+        line: usize,
+        column: usize,
+    },
+    StoreImmediateToImmediate {
+        value: u16,
+        addr: u16,
+        line: usize,
+        column: usize,
+    },
 }

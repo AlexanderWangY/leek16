@@ -126,6 +126,17 @@ STORER
 	Length:
 		16 bits
 
+STOREI
+	Syntax:
+		5 -> [R2]
+		[R2] <- 5
+
+	Operation:
+		MEMORY[R2] = IMM16
+
+	Length:
+		32 bits
+
 
 7. Comparisons/Conditionals
 
