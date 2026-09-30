@@ -16,13 +16,17 @@ PC:        16 bit program counter
 SP:        16 bit stack pointer
 CND:       1 bit condition flag
 
+Register fields are 3 bits. They hold R0-R7 only.
+Only RDSP, WRSP and RDPC use SP and PC (section 7.4).
+Comparisons write CND. BRT and BRF read CND.
+
 3. Memory Layout
 
 Memory spans the full 16 bit address space.
 
 	0x0000 - 0xFFFF
 
-Memory is byte addressable and 16 bit values are stored big-endian.
+Memory is byte addressable. 16 bit values are big-endian.
 
 Example:
 
@@ -33,7 +37,7 @@ Example:
 
 4.  Standard Instruction Format
 
-A standard 16-bit (word) instruction:
+A standard instruction is 16 bits (one word).
 
 15               8        5        2        0
 +----------------+--------+--------+--------+
@@ -41,22 +45,32 @@ A standard 16-bit (word) instruction:
 +----------------+--------+--------+--------+
       7 bits          3        3        3
 
+Unused fields MUST be 0.
+
 
 5.  Immediate Instruction Format
 
-An immediate instruction occupies 32-bits, or two words.
+An immediate instruction is 32 bits (two words).
 
 First word:
 
-15               8        5        2        0
-+----------------+--------+--------+--------+
-|     OPCODE     |   RD   |   RS   |  RESV  |
-+----------------+--------+--------+--------+
-      7 bits          3        3        3
+15               8        5        2    0
++----------------+--------+--------+----+---+
+|     OPCODE     |   RD   |   RS   |RESV|ORD|
++----------------+--------+--------+----+---+
+      7 bits          3        3      2    1
 
-RESV is a *reserved* field and MUST be set to 0.
+RESV MUST be 0.
 
-Second word
+ORD is the operand order. Only ADDI, SUBI, ANDI, ORI, SHLI, SHRI and CMPI use ORD.
+
+	ORD = 0:   register on the left    R1 := R2 - 5
+	ORD = 1:   constant on the left    R1 := 5 - R2
+
+In other immediate instructions, ORD MUST be 0.
+Unused fields MUST be 0.
+
+Second word:
 
 15                                          0
 +-------------------------------------------+
@@ -71,35 +85,49 @@ PC += 2 (for 2 bytes, 16 bits)
 After an immediate instruction:
 PC += 4 (for 4 bytes, 32 bits)
 
-6. Instructions
+6. Constants and Functions
 
-ADD
+Constants:
+
+	Decimal:       1234
+	Hexadecimal:   0x04D2
+	Range:         0 - 65535 (0x0000 - 0xFFFF)
+
+Functions:
+
+	FUNC name:
+		...
+	END
+
+A function is the address of the next instruction.
+Each function name must be unique.
+
+7. Instructions
+
+7.1 Data Movement
+
+MOV
 	Syntax:
-		R1 := R2 + R3
+		R1 := R2
 
 	Operation:
-		R1 = R2 + R3
+		R1 = R2
+
+	Fields:
+		RD = R1, RS1 = R2
 
 	Length:
 		16 bits
 
-ADDI
-	Syntax:
-		R1 := R2 + 5 (constant)
-		R1 := 5 + R2
-
-	Operation:
-		R1 = R2 + IMM16
-
-	Length:
-		32 bits
-
 LOADI
 	Syntax:
-		R1 := 0x1234 (constant)
+		R1 := 0x1234
 
 	Operation:
 		R1 = IMM16
+
+	Fields:
+		RD = R1, IMM16 = 0x1234
 
 	Length:
 		32 bits
@@ -112,8 +140,25 @@ LOADR
 	Operation:
 		R1 = MEMORY[R2]
 
+	Fields:
+		RD = R1, RS1 = R2
+
 	Length:
 		16 bits
+
+LOADA
+	Syntax:
+		R1 <- [0x1000]
+		[0x1000] -> R1
+
+	Operation:
+		R1 = MEMORY[IMM16]
+
+	Fields:
+		RD = R1, IMM16 = 0x1000
+
+	Length:
+		32 bits
 
 STORER
 	Syntax:
@@ -122,6 +167,9 @@ STORER
 
 	Operation:
 		MEMORY[R2] = R1
+
+	Fields:
+		RS1 = R2, RS2 = R1
 
 	Length:
 		16 bits
@@ -134,67 +182,369 @@ STOREI
 	Operation:
 		MEMORY[R2] = IMM16
 
+	Fields:
+		RS = R2, IMM16 = 5
+
 	Length:
 		32 bits
 
+STOREA
+	Syntax:
+		R1 -> [0x1000]
+		[0x1000] <- R1
 
-7. Comparisons/Conditionals
+	Operation:
+		MEMORY[IMM16] = R1
 
-Comparisons set the CND register to either 1 or 0, true or false respectively. They interpret operands as unsigned 16-bit integers.
+	Fields:
+		RS = R1, IMM16 = 0x1000
 
-	R1 == R2
-	R1 != R2
-	R1 > R2
-	R1 < R2
-	R1 >= R2
-	R1 <= R2
+	Length:
+		32 bits
 
-For example:
+7.2 Arithmetic and Logic
 
-	R1 > R2
+ADD
+	Syntax:
+		R1 := R2 + R3
 
-is equivalent to:
+	Operation:
+		R1 = R2 + R3
 
-	CND = (R1 > R2)
+	Fields:
+		RD = R1, RS1 = R2, RS2 = R3
 
-8. Bit shifting
+	Length:
+		16 bits
 
-You can bit shift using the classic << and >>.
+ADDI
+	Syntax:
+		R1 := R2 + 5
+		R1 := 5 + R2
 
-For example:
+	Operation:
+		R1 = R2 + IMM16
 
-	R1 := R2 >> 4
+	Fields:
+		RD = R1, RS = R2, IMM16 = 5, ORD = 0 or 1
 
-This shifts the value in R2 to the right by 4 bits and then stores the result in R1.
+	Length:
+		32 bits
 
-A bit shift using two registers is a 16 bit instruction. A bit shift using a constant is a 32 bit instruction where the second word is the constant.
+SUB
+	Syntax:
+		R1 := R2 - R3
 
-A quick note:
+	Operation:
+		R1 = R2 - R3
 
-	R1 := 5 << R2
+	Fields:
+		RD = R1, RS1 = R2, RS2 = R3
 
-will be compiled into machine instruction as:
+	Length:
+		16 bits
 
-	R1 := 5 (LOADI) (32 bits)
-	R1 := R1 << R2 (SHLR) (16 bits)
+SUBI
+	Syntax:
+		R1 := R2 - 5
+		R1 := 5 - R2
 
-9. Control Flow
+	Operation:
+		if ORD == 0:
+			R1 = R2 - IMM16
+		if ORD == 1:
+			R1 = IMM16 - R2
 
-JMP LABEL
+	Fields:
+		RD = R1, RS = R2, IMM16 = 5, ORD = 0 or 1
 
-	PC = address(LABEL)
+	Length:
+		32 bits
 
-BRT LABEL
+AND
+	Syntax:
+		R1 := R2 & R3
 
-	if CND == 1:
+	Operation:
+		R1 = R2 & R3
+
+	Fields:
+		RD = R1, RS1 = R2, RS2 = R3
+
+	Length:
+		16 bits
+
+ANDI
+	Syntax:
+		R1 := R2 & 5
+		R1 := 5 & R2
+
+	Operation:
+		R1 = R2 & IMM16
+
+	Fields:
+		RD = R1, RS = R2, IMM16 = 5, ORD = 0 or 1
+
+	Length:
+		32 bits
+
+OR
+	Syntax:
+		R1 := R2 | R3
+
+	Operation:
+		R1 = R2 | R3
+
+	Fields:
+		RD = R1, RS1 = R2, RS2 = R3
+
+	Length:
+		16 bits
+
+ORI
+	Syntax:
+		R1 := R2 | 5
+		R1 := 5 | R2
+
+	Operation:
+		R1 = R2 | IMM16
+
+	Fields:
+		RD = R1, RS = R2, IMM16 = 5, ORD = 0 or 1
+
+	Length:
+		32 bits
+
+NOT
+	Syntax:
+		R1 := !R2
+
+	Operation:
+		R1 = NOT R2 (bitwise)
+
+	Fields:
+		RD = R1, RS1 = R2
+
+	Length:
+		16 bits
+
+SHL
+	Syntax:
+		R1 := R2 << R3
+
+	Operation:
+		R1 = R2 << R3
+
+	Fields:
+		RD = R1, RS1 = R2, RS2 = R3
+
+	Length:
+		16 bits
+
+SHLI
+	Syntax:
+		R1 := R2 << 4
+		R1 := 4 << R2
+
+	Operation:
+		if ORD == 0:
+			R1 = R2 << IMM16
+		if ORD == 1:
+			R1 = IMM16 << R2
+
+	Fields:
+		RD = R1, RS = R2, IMM16 = 4, ORD = 0 or 1
+
+	Length:
+		32 bits
+
+SHR
+	Syntax:
+		R1 := R2 >> R3
+
+	Operation:
+		R1 = R2 >> R3 (logical)
+
+	Fields:
+		RD = R1, RS1 = R2, RS2 = R3
+
+	Length:
+		16 bits
+
+SHRI
+	Syntax:
+		R1 := R2 >> 4
+		R1 := 4 >> R2
+
+	Operation:
+		if ORD == 0:
+			R1 = R2 >> IMM16 (logical)
+		if ORD == 1:
+			R1 = IMM16 >> R2 (logical)
+
+	Fields:
+		RD = R1, RS = R2, IMM16 = 4, ORD = 0 or 1
+
+	Length:
+		32 bits
+
+7.3 Comparisons
+
+A comparison sets CND to 1 if it is true, and to 0 if it is false.
+Comparisons use unsigned 16 bit values.
+Each comparison operator has a different opcode.
+
+CMP
+	Syntax:
+		R1 == R2
+		R1 != R2
+		R1 > R2
+		R1 < R2
+		R1 >= R2
+		R1 <= R2
+
+	Operation:
+		CND = (R1 op R2)
+
+	Fields:
+		RS1 = R1, RS2 = R2
+
+	Length:
+		16 bits
+
+CMPI
+	Syntax:
+		R1 == 5
+		R1 != 5
+		R1 > 5
+		R1 < 5
+		R1 >= 5
+		R1 <= 5
+		5 == R1
+		5 != R1
+		5 > R1
+		5 < R1
+		5 >= R1
+		5 <= R1
+
+	Operation:
+		if ORD == 0:
+			CND = (R1 op IMM16)
+		if ORD == 1:
+			CND = (IMM16 op R1)
+
+	Fields:
+		RS = R1, IMM16 = 5, ORD = 0 or 1
+
+	Length:
+		32 bits
+
+7.4 Special Registers
+
+RDSP
+	Syntax:
+		R1 := SP
+
+	Operation:
+		R1 = SP
+
+	Fields:
+		RD = R1
+
+	Length:
+		16 bits
+
+WRSP
+	Syntax:
+		SP := R1
+
+	Operation:
+		SP = R1
+
+	Fields:
+		RS1 = R1
+
+	Length:
+		16 bits
+
+RDPC
+	Syntax:
+		R1 := PC
+
+	Operation:
+		R1 = address(this instruction)
+
+	Fields:
+		RD = R1
+
+	Length:
+		16 bits
+
+7.5 Control Flow
+
+JMP
+	Syntax:
 		JMP LABEL
 
-BRF LABEL
+	Operation:
+		PC = address(LABEL)
 
-	if CND == 0:
-		JMP LABEL
+	Fields:
+		IMM16 = address(LABEL)
 
-All control flow operations are 32 bit instructions. The second word is the 16 bit address to jump to.
+	Length:
+		32 bits
+
+BRT
+	Syntax:
+		BRT LABEL
+
+	Operation:
+		if CND == 1:
+			PC = address(LABEL)
+
+	Fields:
+		IMM16 = address(LABEL)
+
+	Length:
+		32 bits
+
+BRF
+	Syntax:
+		BRF LABEL
+
+	Operation:
+		if CND == 0:
+			PC = address(LABEL)
+
+	Fields:
+		IMM16 = address(LABEL)
+
+	Length:
+		32 bits
+
+8. Assembler Expansions
+
+The assembler calculates operations on two constants.
+
+	R1 := 5 + 3
+
+becomes:
+
+	R1 := 8          (LOADI, 32 bits)
+
+The assembler truncates the result to 16 bits.
+
+9. Invalid Forms
+
+The assembler rejects these forms.
+
+	5 <- [R2]          Load into a constant.
+	[R2] -> 5          Load into a constant.
+	5 -> [0x1000]      Store a constant to a constant address.
+	5 > 3              Compare two constants.
+	PC := R1           Write to PC. Use JMP.
+	R1 := SP + 2       SP or PC in an instruction other than RDSP, WRSP or RDPC.
 
 10. Reset/Boot
 
@@ -204,4 +554,4 @@ On reset:
 	SP = 0xFFFE
 	CND = 0
 
-We being execution at address 0x0000.
+Execution starts at address 0x0000.
