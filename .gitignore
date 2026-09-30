@@ -1,1 +1,3 @@
 /target
+lktest/*
+!lktest/.gitkeep

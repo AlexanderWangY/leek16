@@ -116,15 +116,22 @@ impl<'a> Lexer<'a> {
 
         while let Some(c) = self.current() {
             match c {
-                b'0'..=b'9' => self.advance(),
+                b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9' => self.advance(),
                 _ => break,
             }
         }
 
-        let num: u16 = str::from_utf8(&self.source[start..self.pos])
-            .unwrap()
-            .parse()
-            .unwrap();
+        let text = str::from_utf8(&self.source[start..self.pos]).unwrap();
+
+        let num = match text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            Some(hex) => u16::from_str_radix(hex, 16),
+            None => text.parse(),
+        }
+        .map_err(|_| LexError::InvalidNumber {
+            text: text.to_string(),
+            line: start_line,
+            column: start_col,
+        })?;
 
         Ok(Token {
             kind: TokenKind::Number(num),
