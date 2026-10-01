@@ -6,6 +6,7 @@ use crate::parser::Parser;
 use crate::symbol::SymbolTable;
 
 mod ast;
+mod encode;
 mod error;
 mod lexer;
 mod parser;

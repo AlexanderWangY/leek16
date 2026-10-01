@@ -64,3 +64,9 @@ pub enum ParseError {
 pub enum SymbolError {
     DuplicateFunction { label: String },
 }
+
+#[derive(Debug)]
+pub enum EncodeError {
+    FailedCreateParentPath,
+    FailedCreateFile,
+}
