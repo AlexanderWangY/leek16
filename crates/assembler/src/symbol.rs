@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{Address, Ast, BinaryOp, Instruction, Item, Label, Operand},
+    ast::{Address, Ast, Instruction, Item, Label, Operand},
     error::SymbolError,
 };
 
@@ -46,12 +46,6 @@ impl SymbolTable {
                 ..
             } => 4,
             Instruction::Binary {
-                op: BinaryOp::Sub | BinaryOp::ShiftL | BinaryOp::ShiftR,
-                lhs: Operand::Immediate(_),
-                rhs: Operand::Register(_),
-                ..
-            } => 6,
-            Instruction::Binary {
                 lhs: Operand::Immediate(_),
                 ..
             }
@@ -87,7 +81,10 @@ impl SymbolTable {
             | Instruction::Unary { .. }
             | Instruction::Load { .. }
             | Instruction::Store { .. }
-            | Instruction::Compare { .. } => 2,
+            | Instruction::Compare { .. }
+            | Instruction::ReadSp { .. }
+            | Instruction::WriteSp { .. }
+            | Instruction::ReadPc { .. } => 2,
         };
 
         pc + size

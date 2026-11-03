@@ -3,7 +3,7 @@ use crate::{
         Address, Ast, BinaryOp, CompareOp, Function, Instruction, Item, Label, Operand, UnaryOp,
     },
     error::ParseError,
-    token::{RegisterKind, Token, TokenKind},
+    token::{RegisterKind, SpecialRegister, Token, TokenKind},
 };
 
 pub struct Parser<'a> {
@@ -86,6 +86,7 @@ impl<'a> Parser<'a> {
                 TokenKind::Register(_) | TokenKind::Number(_) => {
                     return self.parse_operand_instruction();
                 }
+                TokenKind::Special(_) => return self.parse_special_write(),
                 TokenKind::LBracket => return self.parse_memory_transfer(),
                 TokenKind::Jmp | TokenKind::Brt | TokenKind::Brf => return self.parse_branch(),
                 _ => return Err(Self::unexpected(token, "instruction")),
@@ -93,6 +94,37 @@ impl<'a> Parser<'a> {
         }
 
         Err(self.missing("instruction"))
+    }
+
+    fn parse_special_write(&mut self) -> Result<Instruction, ParseError> {
+        // Only SP := R1 is valid here. PC is written with JMP.
+        let token = self.current_or("`SP` or `PC`")?;
+        let TokenKind::Special(reg) = &token.kind else {
+            return Err(Self::unexpected(token, "`SP` or `PC`"));
+        };
+        let assigns = matches!(self.peek(1).map(|t| &t.kind), Some(TokenKind::Assign));
+
+        match (reg, assigns) {
+            (SpecialRegister::Pc, true) => Err(ParseError::WriteToPc {
+                line: token.line,
+                column: token.column,
+            }),
+            (SpecialRegister::Sp, true) => {
+                self.advance(); // Skip SP
+                self.advance(); // Skip :=
+
+                let src = self.expect_register()?;
+                self.advance();
+
+                // SP := R1 + 2 is not WRSP
+                if self.current().is_some_and(|t| Self::is_binary_op(&t.kind)) {
+                    return Err(Self::misuse(token, reg));
+                }
+
+                Ok(Instruction::WriteSp { src })
+            }
+            (_, false) => Err(Self::misuse(token, reg)),
+        }
     }
 
     fn parse_operand_instruction(&mut self) -> Result<Instruction, ParseError> {
@@ -203,6 +235,7 @@ impl<'a> Parser<'a> {
         let addr = match &token.kind {
             TokenKind::Register(reg) => Address::Register(reg.clone()),
             TokenKind::Number(num) => Address::Immediate(*num),
+            TokenKind::Special(reg) => return Err(Self::misuse(token, reg)),
             _ => return Err(Self::unexpected(token, "register or number")),
         };
         self.advance();
@@ -282,6 +315,20 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::Assign, "`:=`")?;
         self.advance(); // Skip :=
 
+        // Check for SP or PC on the right side
+        let token = self.current_or("register, number or `!`")?;
+        if let TokenKind::Special(reg) = &token.kind {
+            if op.is_some() {
+                return Err(Self::misuse(token, reg));
+            }
+            self.advance();
+
+            return Ok(match reg {
+                SpecialRegister::Sp => Instruction::ReadSp { dst: dest_reg },
+                SpecialRegister::Pc => Instruction::ReadPc { dst: dest_reg },
+            });
+        }
+
         // Check for unary !
         if matches!(
             &self.current_or("register, number or `!`")?.kind,
@@ -339,6 +386,7 @@ impl<'a> Parser<'a> {
 
         match &token.kind {
             TokenKind::Register(kind) => Ok(kind.clone()),
+            TokenKind::Special(reg) => Err(Self::misuse(token, reg)),
             _ => Err(Self::unexpected(token, "register")),
         }
     }
@@ -349,6 +397,7 @@ impl<'a> Parser<'a> {
         match &token.kind {
             TokenKind::Register(kind) => Ok(Operand::Register(kind.clone())),
             TokenKind::Number(num) => Ok(Operand::Immediate(*num)),
+            TokenKind::Special(reg) => Err(Self::misuse(token, reg)),
             _ => Err(Self::unexpected(token, "register or number")),
         }
     }
@@ -387,6 +436,26 @@ impl<'a> Parser<'a> {
             line,
             column,
         }
+    }
+
+    fn misuse(token: &Token, reg: &SpecialRegister) -> ParseError {
+        ParseError::SpecialRegisterMisuse {
+            reg: reg.clone(),
+            line: token.line,
+            column: token.column,
+        }
+    }
+
+    fn is_binary_op(kind: &TokenKind) -> bool {
+        matches!(
+            kind,
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::And
+                | TokenKind::Or
+                | TokenKind::ShiftLeft
+                | TokenKind::ShiftRight
+        )
     }
 
     fn unexpected(token: &Token, expected: &'static str) -> ParseError {

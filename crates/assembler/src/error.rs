@@ -1,4 +1,4 @@
-use crate::token::TokenKind;
+use crate::token::{SpecialRegister, TokenKind};
 
 #[derive(Debug)]
 pub enum LexError {
@@ -58,6 +58,15 @@ pub enum ParseError {
         line: usize,
         column: usize,
     },
+    WriteToPc {
+        line: usize,
+        column: usize,
+    },
+    SpecialRegisterMisuse {
+        reg: SpecialRegister,
+        line: usize,
+        column: usize,
+    },
 }
 
 #[derive(Debug)]
@@ -69,4 +78,6 @@ pub enum SymbolError {
 pub enum EncodeError {
     FailedCreateParentPath,
     FailedCreateFile,
+    FailedToWrite,
+    UndefinedLabel { label: String },
 }
