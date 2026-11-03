@@ -544,6 +544,7 @@ The assembler rejects these forms.
 	5 -> [0x1000]      Store a constant to a constant address.
 	5 > 3              Compare two constants.
 	PC := R1           Write to PC. Use JMP.
+	SP := 5            Write a constant to SP. WRSP takes a register.
 	R1 := SP + 2       SP or PC in an instruction other than RDSP, WRSP or RDPC.
 
 10. Reset/Boot

@@ -1,6 +1,6 @@
 use crate::{
     error::LexError,
-    token::{RegisterKind, Token, TokenKind},
+    token::{RegisterKind, SpecialRegister, Token, TokenKind},
 };
 
 pub struct Lexer<'a> {
@@ -96,8 +96,8 @@ impl<'a> Lexer<'a> {
             "R5" => TokenKind::Register(RegisterKind::R5),
             "R6" => TokenKind::Register(RegisterKind::R6),
             "R7" => TokenKind::Register(RegisterKind::R7),
-            "SP" => TokenKind::Register(RegisterKind::Sp),
-            "PC" => TokenKind::Register(RegisterKind::Pc),
+            "SP" => TokenKind::Special(SpecialRegister::Sp),
+            "PC" => TokenKind::Special(SpecialRegister::Pc),
 
             _ => TokenKind::Identifier(word.to_string()),
         };

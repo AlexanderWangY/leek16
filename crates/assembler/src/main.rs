@@ -1,11 +1,13 @@
-use std::{env, fs, io::Error};
+use std::{env, fs, io::Error, path::PathBuf};
 
-use crate::error::{LexError, ParseError};
+use crate::encode::Encoder;
+use crate::error::{EncodeError, LexError, ParseError, SymbolError};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::symbol::SymbolTable;
 
 mod ast;
+mod encode;
 mod error;
 mod lexer;
 mod parser;
@@ -15,8 +17,12 @@ mod token;
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     let path: String = args[1].clone();
+    let out: PathBuf = match args.get(2) {
+        Some(out) => PathBuf::from(out),
+        None => PathBuf::from(&path).with_extension("bin"),
+    };
 
-    let source = fs::read_to_string(path)?;
+    let source = fs::read_to_string(&path)?;
 
     let mut lexer = Lexer::new(source.as_bytes());
 
@@ -157,13 +163,67 @@ fn main() -> Result<(), Error> {
                 "store immediate to immediate",
             ));
         }
+        Err(ParseError::WriteToPc { line, column }) => {
+            println!(
+                "cannot write to PC at line {} col {}, use JMP instead",
+                line, column
+            );
+            return Err(Error::new(std::io::ErrorKind::InvalidInput, "write to PC"));
+        }
+        Err(ParseError::SpecialRegisterMisuse { reg, line, column }) => {
+            println!(
+                "{} can only be used as `R := SP`, `SP := R` or `R := PC`, found at line {} col {}",
+                reg.name(),
+                line,
+                column
+            );
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "special register misuse",
+            ));
+        }
     };
 
     println!("{:?}", ast);
 
-    let symbol_table = SymbolTable::build(&ast);
+    let symbol_table = match SymbolTable::build(&ast) {
+        Ok(s) => s,
+        Err(SymbolError::DuplicateFunction { label }) => {
+            println!("duplicate function {}", label);
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "duplicate function",
+            ));
+        }
+    };
 
     println!("{:?}", symbol_table);
+
+    let mut encoder = Encoder::new(ast, symbol_table);
+    match encoder.encode(&out) {
+        Ok(()) => {}
+        Err(EncodeError::UndefinedLabel { label }) => {
+            println!("undefined label {}", label);
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "undefined label",
+            ));
+        }
+        Err(EncodeError::FailedCreateParentPath) => {
+            println!("failed to create parent directory for {}", out.display());
+            return Err(Error::other("failed to create parent directory"));
+        }
+        Err(EncodeError::FailedCreateFile) => {
+            println!("failed to create output file {}", out.display());
+            return Err(Error::other("failed to create output file"));
+        }
+        Err(EncodeError::FailedToWrite) => {
+            println!("failed to write to {}", out.display());
+            return Err(Error::other("failed to write output"));
+        }
+    }
+
+    println!("Wrote {}", out.display());
 
     Ok(())
 }

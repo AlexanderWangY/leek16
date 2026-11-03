@@ -93,6 +93,18 @@ pub enum Instruction {
     BranchFalse {
         target: Label,
     },
+
+    ReadSp {
+        dst: RegisterKind,
+    },
+
+    WriteSp {
+        src: RegisterKind,
+    },
+
+    ReadPc {
+        dst: RegisterKind,
+    },
 }
 
 #[derive(Debug, Clone)]
